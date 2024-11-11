@@ -1,14 +1,14 @@
 use std::sync::Arc;
 use axum::extract::State;
 use axum::http::{StatusCode};
-use axum::{debug_handler, Extension, Json};
+use axum::{Extension, Json};
 use bson::doc;
 use futures_util::TryStreamExt;
 use mongodb::Collection;
 use crate::AppState;
 use crate::db::{create_record, get_record, update_record};
 use crate::error::AppError;
-use crate::structures::{Claims, CreateResource, File, RatedPost, Rating, Resource, User};
+use crate::structures::{Claims, CreateResource, File, RatedPost,  Resource, User};
 
 pub async fn get_posts(
     State(state): State<Arc<AppState>>,
