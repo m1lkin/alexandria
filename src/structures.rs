@@ -161,11 +161,21 @@ impl User {
         }
     }
 
-    pub fn add_rated(&mut self, rated_post: RatedPost) {
+    pub fn add_rated(&mut self, rated_post: RatedPost) -> i32 {
+        let mut rating = 0;
         if self.rated.contains(&rated_post) {
             self.rated.retain(|v| rated_post != *v);
+            match rated_post.rating {
+                Rating::Up => rating -= 1,
+                Rating::Down => rating += 1,
+            }
+        }
+        match rated_post.rating {
+            Rating::Up => rating += 1,
+            Rating::Down => rating -= 1,
         }
         self.rated.push(rated_post);
+        rating
     }
 }
 

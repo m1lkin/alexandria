@@ -51,7 +51,6 @@ pub async fn create_post(
     }
 }
 
-#[debug_handler]
 pub async fn rate_post(
     State(state): State<Arc<AppState>>,
     Extension(user): Extension<Claims>,
@@ -60,14 +59,8 @@ pub async fn rate_post(
     let db = state.client.database("alexandria");
     let posts: Collection<Resource> = db.collection("posts");
     let mut post = get_record(&payload.post, &posts).await?;
-
-    match payload.rating {
-        Rating::Up => post.rating += 1,
-        Rating::Down => post.rating -= 1,
-    }
-
     let mut user: User = get_record(&user.sub, &db.collection("users")).await?;
-    user.add_rated(payload);
+    post.rating += user.add_rated(payload);
     update_record(&post.id, &post, &posts).await?;
     update_record(&user.id, &user, &db.collection("users")).await?;
 

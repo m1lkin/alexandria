@@ -7,9 +7,10 @@ use crate::structures::Claims;
 
 pub fn generate_token(id: String) -> Result<String, AppError> {
     let info = Claims {sub: id, exp: Utc::now().timestamp() + 60 * 60 * 24 * 7};
-    match encode(&Header::default(),
-                 &info,
-                 &EncodingKey::from_secret(std::env::var("SECRET").map_err(|e| AppError::InternalServerError)?.as_bytes())
+    match encode(
+        &Header::default(),
+        &info,
+        &EncodingKey::from_secret(std::env::var("SECRET").map_err(|e| AppError::InternalServerError)?.as_bytes())
     ) {
         Ok(token) => Ok(token),
         Err(_) => Err(AppError::InternalServerError)
