@@ -9,7 +9,7 @@ use serde::Deserialize;
 use crate::AppState;
 use crate::db::{create_record, get_record, update_record};
 use crate::error::AppError;
-use crate::structures::{Claims, CreateResource, RatedPost,  Resource, User};
+use crate::structures::{Claims, CreateResource, RatedPost, Rating, Resource, SendResource, User};
 
 #[derive(Deserialize)]
 pub struct GetParams {
@@ -19,9 +19,12 @@ pub struct GetParams {
 
 pub async fn get_posts(
     State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
     Query(mut params): Query<GetParams>
-) -> Result<Json<Vec<Resource>>, AppError> {
+) -> Result<Json<Vec<SendResource>>, AppError> {
     let posts: Collection<Resource> = state.client.database("alexandria").collection("posts");
+    let user: User = get_record(&claims.sub, &state.client.database("alexandria").collection("users")).await?;
+    
     let mut result = vec![];
     if params.posts.pop() == Some(0) {
         let mut cursor = posts.find(doc! {})
@@ -32,14 +35,23 @@ pub async fn get_posts(
                 result.push(v);
             }
         }
-        return Ok(Json(result));
+    } else {
+        for post_id in params.posts {
+            result.push(get_record(&post_id, &posts).await?);
+        }
     }
-
-    for post_id in params.posts {
-        result.push(get_record(&post_id, &posts).await?);
+    
+    let mut posts = vec![];
+    
+    for post in result.into_iter() {
+        if let Some(pt) = user.rated.iter().find(|x| x.post == post.id) {
+            posts.push(post.into_send_resource(pt.clone().rating));
+        } else {
+            posts.push(post.into_send_resource(Rating::None));
+        }
     }
-
-    Ok(Json(result))
+    
+    Ok(Json(posts))
 }
 
 #[debug_handler]

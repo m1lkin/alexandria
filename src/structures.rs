@@ -41,7 +41,7 @@ pub struct User {
     pub username: String,
     pub password_hash: String,
     summary: Vec<i64>,
-    rated: Vec<RatedPost>,
+    pub rated: Vec<RatedPost>,
     last_upload: DateTime<Utc>,
     register_date: DateTime<Utc>
 }
@@ -58,6 +58,21 @@ pub struct Resource {
     pub files: Vec<File>,
     pub rating: i32,
     upload_time: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SendResource {
+    #[serde(rename = "_id")]
+    pub id: i64,
+    title: String,
+    description: String,
+    author: String,
+    author_name: String,
+    keywords: Vec<String>,
+    pub files: Vec<File>,
+    pub rating: i32,
+    upload_time: DateTime<Utc>,
+    pub rate: Rating,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -120,6 +135,22 @@ impl CreateResource {
     }
 }
 
+impl Resource {
+    pub fn into_send_resource(self, rating: Rating) -> SendResource {
+        SendResource {
+            id: self.id,
+            title: self.title,
+            author: self.author,
+            author_name: self.author_name,
+            description: self.description,
+            keywords: self.keywords,
+            files: self.files,
+            rating: self.rating,
+            upload_time: self.upload_time,
+            rate: rating,
+        }
+    }
+} 
 
 impl User {
     pub fn new(id: String, username: String, password_hash: String) -> Self {
@@ -136,13 +167,13 @@ impl User {
 
     pub fn add_rated(&mut self, rated_post: RatedPost) -> i32 {
         let mut rating = 0;
-        if self.rated.contains(&rated_post) {
-            self.rated.retain(|v| rated_post != *v);
-            match rated_post.rating {
+        if let Some(post) = self.rated.iter().find(|v| v.post == rated_post.post) {
+            match post.rating {
                 Rating::Up => rating -= 1,
                 Rating::Down => rating += 1,
                 Rating::None => {}
             }
+            self.rated.retain(|v| rated_post.post != v.post);
         }
         match rated_post.rating {
             Rating::Up => rating += 1,
@@ -150,6 +181,7 @@ impl User {
             Rating::None => {}
         }
         self.rated.push(rated_post);
+        println!("{}", rating);
         rating
     }
 }
@@ -162,8 +194,8 @@ impl From<User> for Bson {
             "password_hash": user.password_hash,
             "summary": user.summary,
             "rated": user.rated,
-            "last_upload": user.last_upload,
-            "register_date": user.register_date,
+            "last_upload": user.last_upload.to_rfc3339(),
+            "register_date": user.register_date.to_rfc3339(),
         })
     }
 }
@@ -206,18 +238,9 @@ impl From<RatedPost> for Bson {
     fn from(value: RatedPost) -> Self {
         Bson::Document(doc! {
             "post": value.post,
-            "rating": value.rating
+            "rating": match value.rating {
+                
+            Rating::Up => {"Up"}Rating::Down => {"Down"}Rating::None => {"None"}}
         })
-    }
-}
-
-impl From<Rating> for Bson {
-    fn from(value: Rating) -> Self {
-        let v = match value {
-            Rating::Down => doc! { "down": 1 },
-            Rating::Up => doc! { "up": 1 },
-            Rating::None => doc! { "none": 1 }
-        };
-        Bson::Document(v)
     }
 }
