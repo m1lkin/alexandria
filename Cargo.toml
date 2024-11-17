@@ -4,14 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.7.7", features = ["macros"] }
+axum = { version = "0.7.7", features = ["macros", "multipart"] }
 mongodb = "3.1.0"
 bson = { version = "2.13.0", features = ["chrono-0_4", "serde_with", "uuid-0_8"] }
 serde = "1.0.210"
 serde_json = "1.0.129"
 tokio = { version = "1.40.0", features = ["full"] }
+tower-http = {version = "0.6.1", features = ["fs"]}
 dotenvy = "0.15.7"
 chrono = { version = "0.4.38", features = ["serde"] }
 futures-util = "0.3.31"
 jsonwebtoken = "9.3.0"
 argon2-kdf = "1.5.2"
+sanitize-filename = "0.6.0"
+axum-extra = { version = "0.9.5", features = ["query"] }

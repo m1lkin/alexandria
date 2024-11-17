@@ -1,4 +1,4 @@
-use bson::{doc, Binary, Bson};
+use bson::{doc, Bson};
 use chrono::{DateTime, Utc};
 use mongodb::{bson, Collection, Database};
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,7 @@ struct Counter {
 pub enum Rating {
     Up,
     Down,
+    None,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -54,9 +55,15 @@ pub struct Resource {
     author: String,
     author_name: String,
     keywords: Vec<String>,
-    files: Vec<i64>,
+    pub files: Vec<File>,
     pub rating: i32,
     upload_time: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct File {
+    pub(crate) filename: String,
+    pub(crate) size: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,22 +71,6 @@ pub struct CreateResource {
     title: String,
     description: String,
     keywords: Vec<String>,
-    files: Vec<CreateFile>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreateFile {
-    filename: String,
-    data: Vec<u8>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct File {
-    #[serde(rename = "_id")]
-    id: i64,
-    filename: String,
-    data: Binary,
-    upload_time: DateTime<Utc>,
 }
 
 impl IdGenerator {
@@ -114,12 +105,7 @@ impl CreateResource {
         author: String,
         author_name: String,
         id_gen: &IdGenerator,
-        coll: &Collection<File>
     ) -> Result<Resource, AppError> {
-        let mut files = vec![];
-        for i in self.files {
-            files.push(create_record(&i.into_file(&id_gen).await?, coll).await?.inserted_id.as_i64().unwrap());
-        }
         Ok(Resource {
             id: id_gen.get_id("post".into()).await?,
             title: self.title,
@@ -127,26 +113,13 @@ impl CreateResource {
             author,
             author_name,
             keywords: self.keywords,
-            files,
+            files: vec![],
             rating: 0,
             upload_time: Utc::now(),
         })
     }
 }
 
-impl CreateFile {
-    pub async fn into_file(self, id_gen: &IdGenerator) -> Result<File, AppError> {
-        Ok(File {
-            id: id_gen.get_id("file".into()).await?,
-            filename: self.filename,
-            data: Binary {
-                subtype: bson::spec::BinarySubtype::Generic,
-                bytes: self.data,
-            },
-            upload_time: Utc::now(),
-        })
-    }
-}
 
 impl User {
     pub fn new(id: String, username: String, password_hash: String) -> Self {
@@ -168,11 +141,13 @@ impl User {
             match rated_post.rating {
                 Rating::Up => rating -= 1,
                 Rating::Down => rating += 1,
+                Rating::None => {}
             }
         }
         match rated_post.rating {
             Rating::Up => rating += 1,
             Rating::Down => rating -= 1,
+            Rating::None => {}
         }
         self.rated.push(rated_post);
         rating
@@ -204,7 +179,7 @@ impl From<Resource> for Bson {
             "keywords": value.keywords,
             "files": value.files,
             "rating": value.rating,
-            "upload_time": value.upload_time,
+            "upload_time": value.upload_time.to_rfc3339(),
         })
     }
 }
@@ -212,10 +187,8 @@ impl From<Resource> for Bson {
 impl From<File> for Bson {
     fn from(value: File) -> Self {
         Bson::Document(doc! {
-            "_id": value.id,
             "filename": value.filename,
-            "data": value.data,
-            "upload_time": value.upload_time,
+            "size": value.size,
         })
     }
 }
@@ -243,6 +216,7 @@ impl From<Rating> for Bson {
         let v = match value {
             Rating::Down => doc! { "down": 1 },
             Rating::Up => doc! { "up": 1 },
+            Rating::None => doc! { "none": 1 }
         };
         Bson::Document(v)
     }
